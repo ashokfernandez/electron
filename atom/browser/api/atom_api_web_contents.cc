@@ -269,9 +269,7 @@ WebContents::WebContents(v8::Isolate* isolate,
   managed_web_contents()->GetView()->SetDelegate(this);
 
   // Save the preferences in C++.
-  base::DictionaryValue web_preferences;
-  mate::ConvertFromV8(isolate, options.GetHandle(), &web_preferences);
-  new WebContentsPreferences(web_contents, &web_preferences);
+  new WebContentsPreferences(web_contents, options);
 
   web_contents->SetUserAgentOverride(GetBrowserContext()->GetUserAgent());
 
@@ -1124,12 +1122,16 @@ mate::Handle<WebContents> WebContents::Create(
   return handle;
 }
 
-void SetWrapWebContents(const WrapWebContentsCallback& callback) {
-  g_wrap_web_contents = callback;
-}
-
 void ClearWrapWebContents() {
   g_wrap_web_contents.Reset();
+}
+
+void SetWrapWebContents(const WrapWebContentsCallback& callback) {
+  g_wrap_web_contents = callback;
+
+  // Cleanup the wrapper on exit.
+  atom::AtomBrowserMainParts::Get()->RegisterDestructionCallback(
+      base::Bind(ClearWrapWebContents));
 }
 
 }  // namespace api
@@ -1145,7 +1147,6 @@ void Initialize(v8::Local<v8::Object> exports, v8::Local<v8::Value> unused,
   mate::Dictionary dict(isolate, exports);
   dict.SetMethod("create", &atom::api::WebContents::Create);
   dict.SetMethod("_setWrapWebContents", &atom::api::SetWrapWebContents);
-  dict.SetMethod("_clearWrapWebContents", &atom::api::ClearWrapWebContents);
 }
 
 }  // namespace
